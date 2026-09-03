@@ -1,0 +1,1038 @@
+PULSEBOARD PROJECT GUIDE
+========================
+
+1. PROJECT SUMMARY
+------------------
+
+Project name: PulseBoard
+
+PulseBoard is an end-to-end full-stack web application for monitoring website or API uptime.
+
+In simple words:
+You enter the name and URL of a service, such as https://example.com. The application stores that service in PostgreSQL. Then you can click "Run check" from the dashboard. The backend sends an HTTP request to that URL, checks whether the response status matches the expected status code, stores the result in the database, and shows the latest status on the frontend.
+
+This project is good for a resume because it shows:
+
+- Frontend development using React and TypeScript
+- Backend API development using Python and FastAPI
+- Database design using PostgreSQL and SQLAlchemy
+- Docker containerization
+- Docker Compose for running multiple services together
+- Cloud deployment planning using AWS App Runner and Terraform
+- CI/CD basics using GitHub Actions
+
+
+2. TECHNOLOGIES USED
+--------------------
+
+Frontend:
+- React
+- TypeScript
+- Vite
+- CSS
+- lucide-react icons
+
+Backend:
+- Python
+- FastAPI
+- SQLAlchemy
+- Pydantic
+- httpx
+- Uvicorn
+
+Database:
+- PostgreSQL
+
+DevOps:
+- Docker
+- Docker Compose
+- GitHub Actions
+
+Cloud:
+- AWS App Runner
+- Terraform
+- AWS ECR for Docker images
+- Managed PostgreSQL such as AWS RDS, Neon, or Supabase
+
+
+3. PROJECT FUNCTIONALITY
+------------------------
+
+PulseBoard provides these main features:
+
+1. Add a service
+
+The user enters:
+- Service name
+- Service URL
+- Expected HTTP status code
+
+Example:
+- Name: Example Website
+- URL: https://example.com
+- Expected status: 200
+
+The frontend sends this data to the backend using a POST request.
+The backend validates the data and stores it in PostgreSQL.
+
+2. View monitored services
+
+The dashboard lists all services stored in the database.
+For each service, it shows:
+- Service name
+- Service URL
+- Latest status code
+- Latest response time
+- Whether the service is online or not
+
+3. Run a health check
+
+When the user clicks "Run check":
+- The frontend calls the backend endpoint for that service.
+- The backend sends an HTTP GET request to the service URL.
+- The backend records:
+  - Whether the check passed
+  - HTTP status code
+  - Response time in milliseconds
+  - Any error message
+  - Time of the check
+- The result is saved in PostgreSQL.
+- The frontend refreshes and shows the latest result.
+
+4. View backend API documentation
+
+FastAPI automatically generates Swagger documentation.
+
+Local API docs URL:
+http://localhost:8000/docs
+
+
+4. PROJECT ARCHITECTURE
+-----------------------
+
+The project has three main running parts:
+
+1. Frontend container
+
+The frontend is a React TypeScript app.
+It runs in an Nginx container after being built.
+It is available at:
+http://localhost:5173
+
+2. Backend container
+
+The backend is a FastAPI app.
+It exposes REST API endpoints.
+It is available at:
+http://localhost:8000
+
+3. PostgreSQL container
+
+The database stores services and health-check history.
+It runs as a Docker container using the official postgres:16-alpine image.
+
+Docker Compose connects all three containers together.
+
+Local flow:
+
+User browser
+-> React frontend
+-> FastAPI backend
+-> PostgreSQL database
+
+Health-check flow:
+
+User clicks Run check
+-> Frontend calls backend
+-> Backend sends HTTP request to monitored URL
+-> Backend stores result in PostgreSQL
+-> Frontend displays latest status
+
+
+5. FOLDER STRUCTURE
+-------------------
+
+Project root:
+
+README.md
+Main project overview.
+
+PROJECT_GUIDE.txt
+This detailed learning and interview guide.
+
+docker-compose.yml
+Runs frontend, backend, and PostgreSQL together.
+
+.env.example
+Example environment variables.
+
+.gitignore
+Ignores generated files such as node_modules, dist, database files, and Terraform state.
+
+.github/workflows/ci.yml
+GitHub Actions workflow for testing backend, building frontend, and building Docker images.
+
+backend/
+Contains the Python FastAPI backend.
+
+frontend/
+Contains the React TypeScript frontend.
+
+cloud/aws-apprunner/
+Contains Terraform files for cloud deployment planning.
+
+
+6. BACKEND DETAILS
+------------------
+
+Backend path:
+backend/
+
+Important backend files:
+
+backend/app/main.py
+This is the main FastAPI application file.
+It defines all API routes.
+
+backend/app/config.py
+Stores configuration such as DATABASE_URL and CORS_ORIGINS.
+
+backend/app/database.py
+Creates the SQLAlchemy database engine and database session.
+
+backend/app/models.py
+Defines database tables using SQLAlchemy ORM.
+
+backend/app/schemas.py
+Defines request and response models using Pydantic.
+
+backend/requirements.txt
+Lists Python dependencies.
+
+backend/Dockerfile
+Builds the backend Docker image.
+
+backend/tests/test_api.py
+Contains basic API tests.
+
+
+7. BACKEND API ENDPOINTS
+------------------------
+
+1. GET /health
+
+Purpose:
+Checks whether the backend is running.
+
+Response example:
+{"status": "ok"}
+
+2. GET /services
+
+Purpose:
+Returns all monitored services from PostgreSQL.
+
+Used by:
+Frontend dashboard when loading service list.
+
+3. POST /services
+
+Purpose:
+Creates a new monitored service.
+
+Request body example:
+{
+  "name": "Example",
+  "url": "https://example.com",
+  "expected_status": 200
+}
+
+What backend does:
+- Validates name, URL, and status code
+- Creates a new Service row in PostgreSQL
+- Returns the created service
+
+4. POST /services/{service_id}/check
+
+Purpose:
+Runs a health check for one service.
+
+Example:
+POST /services/1/check
+
+What backend does:
+- Finds service with ID 1
+- Sends HTTP GET request to the service URL
+- Measures response time
+- Compares actual status code with expected status code
+- Saves result in health_checks table
+- Returns the check result
+
+5. GET /services/{service_id}/checks
+
+Purpose:
+Returns recent health-check history for one service.
+
+Example:
+GET /services/1/checks
+
+
+8. DATABASE DETAILS
+-------------------
+
+Database:
+PostgreSQL
+
+Database name:
+pulseboard
+
+Database user:
+pulseboard
+
+Database password:
+pulseboard
+
+Docker Compose connection string used by backend:
+postgresql+psycopg://pulseboard:pulseboard@db:5432/pulseboard
+
+The database has two main tables:
+
+1. services
+
+Stores monitored service details.
+
+Columns:
+- id
+- name
+- url
+- expected_status
+- created_at
+
+2. health_checks
+
+Stores every health-check result.
+
+Columns:
+- id
+- service_id
+- ok
+- status_code
+- response_time_ms
+- error
+- created_at
+
+Relationship:
+One service can have many health checks.
+
+Example:
+Service: "Example Website"
+Health checks:
+- Check 1: status 200, 120ms, ok true
+- Check 2: status 200, 100ms, ok true
+- Check 3: timeout error, ok false
+
+
+9. FRONTEND DETAILS
+-------------------
+
+Frontend path:
+frontend/
+
+Important frontend files:
+
+frontend/src/main.tsx
+Main React app.
+It contains the dashboard UI and API calls.
+
+frontend/src/styles.css
+All frontend styling.
+
+frontend/package.json
+Frontend dependencies and npm scripts.
+
+frontend/Dockerfile
+Builds the React app and serves it using Nginx.
+
+frontend/nginx.conf
+Nginx configuration for serving the built frontend.
+
+Frontend features:
+- Shows project title
+- Shows service metrics
+- Form to add a service
+- List of monitored services
+- Button to run health check
+- Status indicator
+- Response time display
+
+
+10. DOCKER DETAILS
+------------------
+
+Docker is used to package the application.
+
+This project has three services in docker-compose.yml:
+
+1. db
+
+Image:
+postgres:16-alpine
+
+Purpose:
+Runs PostgreSQL database.
+
+Port:
+5432
+
+2. backend
+
+Builds from:
+backend/Dockerfile
+
+Purpose:
+Runs FastAPI API.
+
+Port:
+8000
+
+Depends on:
+db must be healthy before backend starts.
+
+3. frontend
+
+Builds from:
+frontend/Dockerfile
+
+Purpose:
+Runs React app through Nginx.
+
+Port:
+5173 on your machine maps to port 80 inside container.
+
+
+11. HOW TO RUN THE PROJECT
+--------------------------
+
+Step 1:
+Install Docker Desktop.
+
+Step 2:
+Open Docker Desktop and make sure it is running.
+
+Step 3:
+Open PowerShell.
+
+Step 4:
+Go to the project folder:
+
+cd D:\Project
+
+Step 5:
+Run the full application:
+
+docker compose up --build
+
+Step 6:
+Open the frontend:
+
+http://localhost:5173
+
+Step 7:
+Open backend API docs:
+
+http://localhost:8000/docs
+
+Step 8:
+Try adding a service:
+
+Name:
+Example
+
+URL:
+https://example.com
+
+Expected status:
+200
+
+Step 9:
+Click "Run check".
+
+Step 10:
+See the status and response time update on the dashboard.
+
+
+12. HOW TO STOP THE PROJECT
+---------------------------
+
+In the terminal where Docker Compose is running, press:
+
+Ctrl + C
+
+Then run:
+
+docker compose down
+
+If you also want to delete the PostgreSQL data volume:
+
+docker compose down -v
+
+Only use -v if you want to delete saved database data.
+
+
+13. USEFUL COMMANDS
+-------------------
+
+Start project:
+docker compose up --build
+
+Start in background:
+docker compose up --build -d
+
+Stop containers:
+docker compose down
+
+Stop containers and delete database data:
+docker compose down -v
+
+Check running containers:
+docker compose ps
+
+View backend logs:
+docker compose logs backend
+
+View frontend logs:
+docker compose logs frontend
+
+View database logs:
+docker compose logs db
+
+Rebuild only backend:
+docker compose build backend
+
+Rebuild only frontend:
+docker compose build frontend
+
+
+14. HOW TO TEST THE BACKEND MANUALLY
+------------------------------------
+
+Open:
+http://localhost:8000/docs
+
+FastAPI Swagger UI will open.
+
+You can test:
+
+GET /health
+Checks if backend is alive.
+
+POST /services
+Adds a service.
+
+GET /services
+Lists services.
+
+POST /services/{service_id}/check
+Runs a health check.
+
+GET /services/{service_id}/checks
+Shows check history.
+
+
+15. GITHUB ACTIONS CI/CD
+------------------------
+
+CI file:
+.github/workflows/ci.yml
+
+This workflow runs on:
+- Push to main branch
+- Pull request
+
+It has three jobs:
+
+1. backend
+
+What it does:
+- Starts PostgreSQL
+- Installs Python dependencies
+- Runs pytest
+
+2. frontend
+
+What it does:
+- Installs Node dependencies
+- Builds React app
+
+3. docker
+
+What it does:
+- Runs docker compose build
+- Confirms Docker images can be built
+
+Why this is useful:
+It shows employers that you know basic CI/CD and can automate verification.
+
+
+16. CLOUD DEPLOYMENT PLAN
+-------------------------
+
+Cloud folder:
+cloud/aws-apprunner/
+
+This project includes Terraform files for AWS App Runner.
+
+Important files:
+
+cloud/aws-apprunner/main.tf
+Defines AWS App Runner services for backend and frontend.
+
+cloud/aws-apprunner/variables.tf
+Defines required input variables.
+
+cloud/aws-apprunner/outputs.tf
+Prints final backend and frontend URLs.
+
+cloud/aws-apprunner/README.md
+Short cloud deployment instructions.
+
+For real cloud deployment:
+
+1. Build backend Docker image.
+2. Build frontend Docker image.
+3. Push both images to AWS ECR.
+4. Create a managed PostgreSQL database using AWS RDS, Neon, or Supabase.
+5. Pass image URLs and database URL to Terraform.
+6. Terraform creates AWS App Runner services.
+
+Important note:
+The cloud folder is a deployment blueprint. It is included to show cloud and infrastructure-as-code knowledge. You do not need to deploy it immediately to learn the project.
+
+
+17. HOW TO EXPLAIN THIS PROJECT IN AN INTERVIEW
+-----------------------------------------------
+
+Short explanation:
+
+"PulseBoard is a full-stack uptime monitoring dashboard. Users can register website or API URLs, run health checks, and view the latest status and response time. I built the frontend with React and TypeScript, the backend with FastAPI, and used PostgreSQL for persistent storage. The whole application is containerized with Docker Compose, and I added a Terraform blueprint for AWS App Runner deployment."
+
+Detailed explanation:
+
+"The frontend provides a dashboard where users can add services and trigger health checks. The React app calls FastAPI REST endpoints. The backend validates input with Pydantic, stores service data using SQLAlchemy ORM, and connects to PostgreSQL. When a health check is triggered, the backend uses httpx to send an HTTP request to the target URL, measures response time, compares the status code with the expected status, stores the result, and returns it to the frontend. Docker Compose runs the frontend, backend, and PostgreSQL together locally. I also added GitHub Actions for CI and Terraform files to show how the app could be deployed on AWS App Runner."
+
+
+18. RESUME DESCRIPTION
+----------------------
+
+Project title:
+PulseBoard - Dockerized Service Monitoring Dashboard
+
+Resume summary:
+Built a Dockerized full-stack uptime monitoring dashboard using React, TypeScript, FastAPI, PostgreSQL, and AWS App Runner infrastructure as code.
+
+Resume bullet points:
+
+- Built a full-stack service monitoring dashboard with React, TypeScript, FastAPI, and PostgreSQL.
+- Designed REST APIs for service registration, health-check execution, and status history.
+- Used SQLAlchemy ORM to model PostgreSQL tables and relationships.
+- Implemented HTTP health checks with response time tracking and status validation.
+- Containerized frontend, backend, and PostgreSQL using Docker Compose.
+- Added GitHub Actions CI for backend tests, frontend builds, and Docker image builds.
+- Created Terraform configuration for deploying Dockerized services to AWS App Runner.
+
+
+19. IMPORTANT INTERVIEW QUESTIONS AND ANSWERS
+---------------------------------------------
+
+Question:
+What problem does this project solve?
+
+Answer:
+It helps monitor whether websites or APIs are online. Users can add URLs, run health checks, and see status code and response time.
+
+Question:
+Why did you use PostgreSQL?
+
+Answer:
+PostgreSQL is a reliable relational database. It is commonly used in production systems and works well for structured data like services and health-check history.
+
+Question:
+Why did you use FastAPI?
+
+Answer:
+FastAPI is fast, modern, and easy to use for REST APIs. It also provides automatic validation with Pydantic and automatic Swagger documentation.
+
+Question:
+Why did you use React and TypeScript?
+
+Answer:
+React is widely used for frontend development, and TypeScript adds type safety, which helps catch bugs during development.
+
+Question:
+What is Docker Compose doing?
+
+Answer:
+Docker Compose runs multiple containers together: frontend, backend, and PostgreSQL. It also manages networking between them.
+
+Question:
+How does the backend connect to PostgreSQL?
+
+Answer:
+The backend uses SQLAlchemy with this PostgreSQL connection string:
+postgresql+psycopg://pulseboard:pulseboard@db:5432/pulseboard
+
+In Docker Compose, the hostname db refers to the PostgreSQL container.
+
+Question:
+What happens when you click Run check?
+
+Answer:
+The frontend calls the backend endpoint POST /services/{id}/check. The backend sends an HTTP GET request to the stored URL, measures response time, checks the status code, saves the result in PostgreSQL, and returns the result.
+
+Question:
+What is SQLAlchemy?
+
+Answer:
+SQLAlchemy is a Python ORM. It lets us define database tables as Python classes and query the database using Python code.
+
+Question:
+What is Pydantic used for?
+
+Answer:
+Pydantic validates request and response data. For example, it checks that the URL is valid and that the expected status code is between 100 and 599.
+
+Question:
+How would you improve this project in the future?
+
+Answer:
+I would add authentication, scheduled automatic checks, email or Slack alerts, charts for uptime history, pagination, and production database migrations with Alembic.
+
+
+20. FILE-BY-FILE EXPLANATION
+----------------------------
+
+docker-compose.yml
+Runs the complete application locally.
+It defines db, backend, and frontend services.
+
+backend/Dockerfile
+Creates a Python Docker image, installs backend dependencies, copies backend code, and starts Uvicorn.
+
+backend/requirements.txt
+Lists Python packages needed by the backend.
+
+backend/app/config.py
+Reads environment variables such as DATABASE_URL.
+
+backend/app/database.py
+Creates the database engine and session factory.
+
+backend/app/models.py
+Defines Service and HealthCheck database tables.
+
+backend/app/schemas.py
+Defines API request and response shapes.
+
+backend/app/main.py
+Defines the FastAPI app, CORS settings, API routes, and health-check logic.
+
+backend/tests/test_api.py
+Contains basic tests for health endpoint and service creation.
+
+frontend/package.json
+Lists frontend dependencies and scripts.
+
+frontend/src/main.tsx
+Contains React state, form handling, API calls, and dashboard rendering.
+
+frontend/src/styles.css
+Styles the dashboard UI.
+
+frontend/Dockerfile
+Builds React app using Node and serves final static files using Nginx.
+
+frontend/nginx.conf
+Tells Nginx how to serve the frontend app.
+
+cloud/aws-apprunner/main.tf
+Defines AWS App Runner services and IAM role for ECR image access.
+
+.github/workflows/ci.yml
+Automates testing and builds on GitHub.
+
+
+21. LEARNING ORDER FOR BEGINNERS
+--------------------------------
+
+If you are new, learn in this order:
+
+1. Learn what the project does from sections 1 to 4.
+2. Run the project with Docker Compose.
+3. Open the frontend and add a service.
+4. Open FastAPI docs and test endpoints.
+5. Read backend/app/models.py to understand the database tables.
+6. Read backend/app/main.py to understand API routes.
+7. Read frontend/src/main.tsx to understand frontend API calls.
+8. Read docker-compose.yml to understand containers.
+9. Read GitHub Actions workflow.
+10. Read Terraform files only after you understand the app.
+
+
+22. SIMPLE DEMO SCRIPT
+----------------------
+
+Use this while showing the project:
+
+1. "This is PulseBoard, a service uptime monitoring dashboard."
+2. "I built it using React, TypeScript, FastAPI, PostgreSQL, Docker, and Terraform."
+3. "I can add a service by entering its name, URL, and expected status code."
+4. "When I click Run check, the backend sends a request to the URL."
+5. "The backend stores the status code and response time in PostgreSQL."
+6. "The dashboard refreshes and shows whether the service is online."
+7. "The app runs locally using Docker Compose with three containers."
+8. "I also added GitHub Actions CI and a Terraform blueprint for AWS App Runner."
+
+
+23. COMMON ISSUES
+-----------------
+
+Issue:
+docker compose up fails.
+
+Possible reason:
+Docker Desktop is not running.
+
+Fix:
+Open Docker Desktop first, then run docker compose up --build again.
+
+Issue:
+Frontend does not open.
+
+Fix:
+Check:
+http://localhost:5173
+
+Also run:
+docker compose ps
+
+Issue:
+Backend API does not open.
+
+Fix:
+Check:
+http://localhost:8000/docs
+
+Also run:
+docker compose logs backend
+
+Issue:
+Database connection fails.
+
+Fix:
+Make sure db service is healthy:
+docker compose ps
+
+Check database logs:
+docker compose logs db
+
+
+24. FUTURE IMPROVEMENTS
+-----------------------
+
+You can extend this project later with:
+
+- User login and authentication
+- Scheduled automatic health checks
+- Email or Slack alerts
+- Uptime percentage calculation
+- Charts for response time history
+- Search and filtering
+- Pagination
+- Alembic database migrations
+- Production deployment to AWS
+- Kubernetes deployment
+- Monitoring with Prometheus and Grafana
+
+
+25. FINAL PROJECT PITCH
+-----------------------
+
+"PulseBoard is a practical full-stack monitoring dashboard. It demonstrates frontend development, backend API design, PostgreSQL persistence, Dockerized local development, CI automation, and cloud deployment planning. The project is simple enough to understand clearly but strong enough to show real-world engineering skills."
+
+
+26. NEW FEATURES ADDED: EDIT, DELETE, AND HISTORY
+-------------------------------------------------
+
+The project now supports more complete CRUD functionality.
+
+CRUD means:
+- Create
+- Read
+- Update
+- Delete
+
+In this project:
+
+Create:
+You can add a new monitored service from the form.
+
+Read:
+You can view all monitored services on the dashboard.
+
+Update:
+You can edit an existing service.
+Click the edit button on a service row.
+The form will fill with the old values.
+Change the name, URL, or expected status code.
+Click Save changes.
+The backend updates the service in PostgreSQL.
+
+Delete:
+You can delete a service.
+Click the delete button on a service row.
+The app asks for confirmation.
+If you confirm, the backend deletes the service from PostgreSQL.
+Its related health-check history is also deleted because of cascade delete.
+
+History:
+You can click History on a service row.
+The app shows recent health-check records for that service.
+This includes:
+- Online or failed result
+- HTTP status code
+- Response time
+- Date and time
+- Error message if the check failed
+
+Why these features add value:
+
+Earlier, the project only added and checked services.
+Now it behaves more like a real application because users can manage data after creating it.
+This makes the project stronger for interviews because you can say you implemented CRUD operations with a PostgreSQL database.
+
+
+27. NEW API ENDPOINTS
+---------------------
+
+PUT /services/{service_id}
+
+Purpose:
+Edits an existing service.
+
+Example request:
+{
+  "name": "Updated Website",
+  "url": "https://example.com",
+  "expected_status": 200
+}
+
+What happens:
+- FastAPI receives the request.
+- Pydantic validates the request body.
+- SQLAlchemy finds the service by ID.
+- The backend updates the row in PostgreSQL.
+- The updated service is returned to the frontend.
+
+DELETE /services/{service_id}
+
+Purpose:
+Deletes a service.
+
+What happens:
+- FastAPI receives the delete request.
+- SQLAlchemy finds the service by ID.
+- The backend deletes the row from PostgreSQL.
+- Related health-check rows are also deleted.
+- The frontend refreshes the list.
+
+
+28. HOW TO CHECK IF DATA IS STORED IN POSTGRESQL
+------------------------------------------------
+
+This is very important for interviews.
+You should be able to prove that data is stored in the database, not just shown on the screen.
+
+Step 1:
+Start the project:
+
+cd D:\Project
+
+docker compose up --build
+
+Step 2:
+Open the frontend:
+
+http://localhost:5173
+
+Step 3:
+Add a service.
+
+Example:
+
+Name:
+Example
+
+URL:
+https://example.com
+
+Expected status:
+200
+
+Step 4:
+Click Run check.
+
+Step 5:
+Open a second PowerShell window.
+
+Step 6:
+Go to the project folder:
+
+cd D:\Project
+
+Step 7:
+Open PostgreSQL inside the Docker container:
+
+docker compose exec db psql -U pulseboard -d pulseboard
+
+Step 8:
+List all database tables:
+
+\dt
+
+You should see:
+- services
+- health_checks
+
+Step 9:
+Check saved services:
+
+select * from services;
+
+Step 10:
+Check saved health checks:
+
+select * from health_checks;
+
+Step 11:
+Run a useful join query:
+
+select s.name, s.url, h.ok, h.status_code, h.response_time_ms, h.created_at
+from services s
+left join health_checks h on h.service_id = s.id
+order by h.created_at desc;
+
+Step 12:
+Exit PostgreSQL:
+
+\q
+
+Interview explanation:
+
+"To verify persistence, I opened the PostgreSQL container using docker compose exec and queried the services and health_checks tables with psql. This confirmed that the frontend actions were saved in PostgreSQL."
+
+
+29. UPDATED INTERVIEW PITCH
+---------------------------
+
+"PulseBoard is a full-stack uptime monitoring dashboard. It allows users to create, edit, delete, and monitor website or API URLs. The frontend is built with React and TypeScript, the backend is built with FastAPI, and all service and health-check data is stored in PostgreSQL. I used SQLAlchemy for database modeling, Docker Compose to run the frontend, backend, and database together, GitHub Actions for CI, and Terraform as a cloud deployment blueprint for AWS App Runner."
+
